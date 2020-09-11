@@ -36,6 +36,7 @@ class Network:
 
     def __init__(self):
         ### TODO: Initialize any class variables desired ###
+        pass
 
     def load_model(self):
         ### TODO: Load the model ###

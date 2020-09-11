@@ -1,0 +1,29 @@
+apt install npm nodejs python3-pip libzmq3-dev libkrb5-dev ffmpeg cmake
+pip3 install numpy paho-mqtt
+
+git clone https://github.com/openvinotoolkit/openvino.git
+mkdir model
+cd model
+wget https://raw.githubusercontent.com/pjreddie/darknet/master/data/coco.names
+wget https://pjreddie.com/media/files/yolov3.weights
+
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt update
+sudo apt install python3.6
+sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
+sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.6 2
+sudo pip3 install 'tensorflow<2.0'
+sudo pip3 install pillow --upgrade
+
+python3 ../../tensorflow-yolo-v3/convert_weights_pb.py --class_names coco.names --data_format NHWC --weights_file yolov3.weights
+
+apt remove  python3-apt
+apt install  python3-apt 
+sudo ./install_prerequisites_tf.sh 
+python3 ../../openvino/model-optimizer/mo.py --input_model frozen_darknet_yolov3_model.pb --tensorflow_use_custom_operations_config ../../openvino/model-optimizer/extensions/front/tf/yolo_v3.json --batch 1
+
+pip3 install opencv-python
+
+cmake -DCMAKE_BUILD_TYPE=Release .. -DENABLE_CLDNN=OFF -DENABLE_PYTHON=ON -DPYTHON_EXECUTABLE=/usr/bin/python3.8 -DPYTHON_LIBRARY=/usr/lib/x86_64-linux-gnu/libpython3.8.so -DPYTHON_INCLUDE_DIR=/usr/include/python3.8
+make --jobs=$(nproc --all)
+
