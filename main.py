@@ -33,6 +33,8 @@ import paho.mqtt.client as mqtt
 from argparse import ArgumentParser
 from inference import Network
 
+import numpy as np
+
 # MQTT server environment variables
 HOSTNAME = socket.gethostname()
 IPADDRESS = socket.gethostbyname(HOSTNAME)
@@ -74,6 +76,20 @@ def connect_mqtt():
 
     return client
 
+def draw_masks(result, width, height):
+    '''
+    Draw semantic mask classes onto the frame.
+    '''
+    # Create a mask with color by class
+    classes = cv2.resize(result[0].transpose((1,2,0)), (width,height), interpolation=cv2.INTER_NEAREST)
+    unique_classes = np.unique(classes)
+    out_mask = classes * (255/20)
+    
+    # Stack the mask so FFmpeg understands it
+    out_mask = np.dstack((out_mask, out_mask, out_mask))
+    # out_mask = np.uint8(out_mask)
+
+    return out_mask, unique_classes
 
 def infer_on_stream(args, client):
     """
@@ -90,23 +106,49 @@ def infer_on_stream(args, client):
     prob_threshold = args.prob_threshold
 
     ### TODO: Load the model through `infer_network` ###
+    infer_network.load_model(args.model)
+    net_input_shape = infer_network.get_input_shape()
 
     ### TODO: Handle the input stream ###
+    cap = cv2.VideoCapture(args.input)
+    cap.open(args.input)
 
+    width = int(cap.get(3))
+    height = int(cap.get(4))
+    i=0
     ### TODO: Loop until stream is over ###
+    while cap.isOpened():
 
         ### TODO: Read from the video capture ###
+        flag, frame = cap.read()
+        if not flag:
+            break
 
         ### TODO: Pre-process the image as needed ###
+        frame_resized = cv2.resize(frame, (net_input_shape[3], net_input_shape[2]))
+        frame_resized = frame_resized.transpose((2,0,1))
+        frame_resized = frame_resized.reshape(1, *frame_resized.shape)
 
         ### TODO: Start asynchronous inference for specified request ###
+        infer_network.exec_net(frame_resized)
 
         ### TODO: Wait for the result ###
-
+        if infer_network.wait() == 0:
             ### TODO: Get the results of the inference request ###
-
+            result = infer_network.get_output().buffer
+            print(result.shape)
+            #"""
+            rectancles = [[int(x[3]*width),
+                           int(x[4]*height),
+                           int(x[5]*width),
+                           int(x[6]*height)]
+                          for x in result[0][0] if x[2]>prob_threshold]
+            for rect in rectancles:
+                cv2.rectangle(frame,(rect[0],rect[1]),(rect[2],rect[3]),[255,0,0],6)
+            cv2.imshow('test', frame)
+            cv2.waitKey()
+            #"""
             ### TODO: Extract any desired stats from the results ###
-
             ### TODO: Calculate and send relevant information on ###
             ### current_count, total_count and duration to the MQTT server ###
             ### Topic "person": keys of "count" and "total" ###
@@ -115,7 +157,10 @@ def infer_on_stream(args, client):
         ### TODO: Send the frame to the FFMPEG server ###
 
         ### TODO: Write an output image if `single_image_mode` ###
-
+        if i<0:
+            i+=1
+        else:
+            break
 
 def main():
     """

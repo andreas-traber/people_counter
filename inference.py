@@ -35,23 +35,39 @@ class Network:
     """
 
     def __init__(self):
-        ### TODO: Initialize any class variables desired ###
+        ### Initialize any class variables desired ###
         pass
 
-    def load_model(self):
-        ### TODO: Load the model ###
+    def load_model(self, model, device="CPU", cpu_extension=None):
+        ### Load the model ###
+        model_xml = model
+        model_bin = os.path.splitext(model_xml)[0] + ".bin"
+
+        self.ie = IECore()
+        self.net = self.ie.read_network(model=model_xml, weights=model_bin)
+        self.exec_network = self.ie.load_network(network=self.net, device_name=device)
+        # print(self.ie.query_network(network=self.net, device_name=device))
+
+        # net = IENetwork()
+        # print(self.net.layers)
+
         ### TODO: Check for supported layers ###
+        self.output_blobs = next(iter(self.net.outputs))
+        print(self.output_blobs)
+        # print(self.output_blobs)
+        #print(net.outputs)
         ### TODO: Add any necessary extensions ###
         ### TODO: Return the loaded inference plugin ###
         ### Note: You may need to update the function parameters. ###
         return
 
     def get_input_shape(self):
-        ### TODO: Return the shape of the input layer ###
-        return
+        ### Return the shape of the input layer ###
+        return self.net.input_info['inputs'].input_data.shape
 
-    def exec_net(self):
-        ### TODO: Start an asynchronous request ###
+    def exec_net(self, image):
+        ### Start an asynchronous request ###
+        self.exec_network.start_async(request_id=0, inputs={'inputs': image})
         ### TODO: Return any necessary information ###
         ### Note: You may need to update the function parameters. ###
         return
@@ -60,9 +76,10 @@ class Network:
         ### TODO: Wait for the request to be complete. ###
         ### TODO: Return any necessary information ###
         ### Note: You may need to update the function parameters. ###
-        return
+        status = self.exec_network.requests[0].wait(-1)
+        return status
 
     def get_output(self):
         ### TODO: Extract and return the output results
         ### Note: You may need to update the function parameters. ###
-        return
+        return self.exec_network.requests[0].output_blobs[self.output_blobs]

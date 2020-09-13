@@ -2,3 +2,5 @@ keras-YOLOv3-model-set
 model/*
 tensorflow-yolo-v3
 openvino
+__pycache__
+test.py
