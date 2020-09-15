@@ -35,6 +35,8 @@ from inference import Network
 
 import numpy as np
 
+import itertools
+
 # MQTT server environment variables
 HOSTNAME = socket.gethostname()
 IPADDRESS = socket.gethostbyname(HOSTNAME)
@@ -135,9 +137,8 @@ def infer_on_stream(args, client):
         ### TODO: Wait for the result ###
         if infer_network.wait() == 0:
             ### TODO: Get the results of the inference request ###
-            result = infer_network.get_output().buffer
-            print(result.shape)
-            #"""
+            result = infer_network.get_output()
+            """
             rectancles = [[int(x[3]*width),
                            int(x[4]*height),
                            int(x[5]*width),
@@ -149,6 +150,17 @@ def infer_on_stream(args, client):
             cv2.waitKey()
             #"""
             ### TODO: Extract any desired stats from the results ###
+            person_list = []
+            for layer_name, blob in result.items():
+                bbox_size = infer_network.get_bbox_size(layer_name)
+                res=blob.buffer[0]
+                for row, col, n in  itertools.product(range(res.shape[1]), range(res.shape[2]), range(infer_network.get_num_bboxes(layer_name))):
+                    bbox = res[n*bbox_size:(n+1)*bbox_size, row, col]
+                    # only need person class
+                    bbox = bbox[:6]
+                    if bbox[4]>args.prob_threshold and bbox[5]>args.prob_threshold:
+                        person_list.append(bbox)
+            print(person_list)
             ### TODO: Calculate and send relevant information on ###
             ### current_count, total_count and duration to the MQTT server ###
             ### Topic "person": keys of "count" and "total" ###

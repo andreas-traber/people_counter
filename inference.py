@@ -82,4 +82,10 @@ class Network:
     def get_output(self):
         ### TODO: Extract and return the output results
         ### Note: You may need to update the function parameters. ###
-        return self.exec_network.requests[0].output_blobs[self.output_blobs]
+        return self.exec_network.requests[0].output_blobs
+
+    def get_bbox_size(self, layer_name):
+        return 1 + int(self.net.layers[layer_name].params['coords']) + int(self.net.layers[layer_name].params['classes'])
+
+    def get_num_bboxes(self, layer_name):
+        return len(self.net.layers[layer_name].params['mask'].split(','))
