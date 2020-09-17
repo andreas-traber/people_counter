@@ -25,6 +25,7 @@
 import os
 import sys
 import logging as log
+from numpy.lib.function_base import append
 from openvino.inference_engine import IENetwork, IECore
 
 
@@ -53,7 +54,6 @@ class Network:
 
         ### TODO: Check for supported layers ###
         self.output_blobs = next(iter(self.net.outputs))
-        print(self.output_blobs)
         # print(self.output_blobs)
         #print(net.outputs)
         ### TODO: Add any necessary extensions ###
@@ -89,3 +89,11 @@ class Network:
 
     def get_num_bboxes(self, layer_name):
         return len(self.net.layers[layer_name].params['mask'].split(','))
+
+    def create_anchors(self, layer_name):
+        anchors = self.net.layers[layer_name].params['anchors'].split(',')
+
+        self.anchors =  []
+        for i in [int(i) for i in self.net.layers[layer_name].params['mask'].split(',')]:
+            self.anchors += [ anchors[i * 2], anchors[i * 2 + 1]]
+        print(self.anchors)

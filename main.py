@@ -36,6 +36,7 @@ from inference import Network
 import numpy as np
 
 import itertools
+from math import exp
 
 # MQTT server environment variables
 HOSTNAME = socket.gethostname()
@@ -150,17 +151,45 @@ def infer_on_stream(args, client):
             cv2.waitKey()
             #"""
             ### TODO: Extract any desired stats from the results ###
-            person_list = []
+            person_box = []
+            person_confidence = []
             for layer_name, blob in result.items():
                 bbox_size = infer_network.get_bbox_size(layer_name)
                 res=blob.buffer[0]
                 for row, col, n in  itertools.product(range(res.shape[1]), range(res.shape[2]), range(infer_network.get_num_bboxes(layer_name))):
                     bbox = res[n*bbox_size:(n+1)*bbox_size, row, col]
-                    # only need person class
+                    # only need person class probability
                     bbox = bbox[:6]
                     if bbox[4]>args.prob_threshold and bbox[5]>args.prob_threshold:
-                        person_list.append(bbox)
-            print(person_list)
+                        print(res.shape)
+                        x = (col + bbox[0]) / res.shape[1]
+                        y = (row + bbox[1]) / res.shape[2]
+                        width_ = exp(bbox[2])
+                        height_ = exp(bbox[3])
+                        print(width_)
+                        print(n)
+                        infer_network.create_anchors(layer_name)
+                        width_ = width_ * float(infer_network.anchors[2 * n]) / float(net_input_shape[2])
+                        height_ = height_ * float(infer_network.anchors[2 * n + 1]) / float(net_input_shape[3])
+                        print(width_)
+                        xmin = int((x - width_ / 2) * width)
+                        ymin = int((y - height_ / 2) * height)
+                        xmax = int(xmin + width_ * width)
+                        ymax = int(ymin + height_ * height)
+                        person_box.append([xmin, ymin, xmax, ymax])
+                        person_confidence.append(float(bbox[5]))
+            if len(person_box)>0:
+                nms_indexes = cv2.dnn.NMSBoxes(person_box, person_confidence, args.prob_threshold, args.prob_threshold)
+                person_box_final = [person_box[i] for i in nms_indexes.flatten()]
+                for rect in person_box_final:
+                    #print('draw: %s' % person)
+                    cv2.rectangle(frame,(rect[0],rect[1]),(rect[2],rect[3]),[0,0,255],6)
+            cv2.imshow('test', frame)
+            key = cv2.waitKey(1)
+
+            if key in {ord("q"), ord("Q"), 27}: # ESC key
+                break
+                
             ### TODO: Calculate and send relevant information on ###
             ### current_count, total_count and duration to the MQTT server ###
             ### Topic "person": keys of "count" and "total" ###
@@ -169,10 +198,7 @@ def infer_on_stream(args, client):
         ### TODO: Send the frame to the FFMPEG server ###
 
         ### TODO: Write an output image if `single_image_mode` ###
-        if i<0:
-            i+=1
-        else:
-            break
+
 
 def main():
     """
