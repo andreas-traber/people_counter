@@ -4,3 +4,5 @@ tensorflow-yolo-v3
 openvino
 __pycache__
 test.py
+.idea
+out.mp4

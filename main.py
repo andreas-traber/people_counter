@@ -37,6 +37,7 @@ import numpy as np
 
 import itertools
 from math import exp
+import copy
 
 # MQTT server environment variables
 HOSTNAME = socket.gethostname()
@@ -118,7 +119,11 @@ def infer_on_stream(args, client):
 
     width = int(cap.get(3))
     height = int(cap.get(4))
-    i=0
+    out = cv2.VideoWriter('out.mp4', cv2.VideoWriter_fourcc('M','J','P','G'), cap.get(cv2.CAP_PROP_FPS), (width,height))
+    no_person_for_frames = 0
+    person_gone = True
+    people_count = 0
+    prev_person_box_final = None
     ### TODO: Loop until stream is over ###
     while cap.isOpened():
 
@@ -139,20 +144,10 @@ def infer_on_stream(args, client):
         if infer_network.wait() == 0:
             ### TODO: Get the results of the inference request ###
             result = infer_network.get_output()
-            """
-            rectancles = [[int(x[3]*width),
-                           int(x[4]*height),
-                           int(x[5]*width),
-                           int(x[6]*height)]
-                          for x in result[0][0] if x[2]>prob_threshold]
-            for rect in rectancles:
-                cv2.rectangle(frame,(rect[0],rect[1]),(rect[2],rect[3]),[255,0,0],6)
-            cv2.imshow('test', frame)
-            cv2.waitKey()
-            #"""
             ### TODO: Extract any desired stats from the results ###
             person_box = []
             person_confidence = []
+            stop_frame = False
             for layer_name, blob in result.items():
                 bbox_size = infer_network.get_bbox_size(layer_name)
                 res=blob.buffer[0]
@@ -161,17 +156,13 @@ def infer_on_stream(args, client):
                     # only need person class probability
                     bbox = bbox[:6]
                     if bbox[4]>args.prob_threshold and bbox[5]>args.prob_threshold:
-                        print(res.shape)
                         x = (col + bbox[0]) / res.shape[1]
                         y = (row + bbox[1]) / res.shape[2]
                         width_ = exp(bbox[2])
                         height_ = exp(bbox[3])
-                        print(width_)
-                        print(n)
                         infer_network.create_anchors(layer_name)
                         width_ = width_ * float(infer_network.anchors[2 * n]) / float(net_input_shape[2])
                         height_ = height_ * float(infer_network.anchors[2 * n + 1]) / float(net_input_shape[3])
-                        print(width_)
                         xmin = int((x - width_ / 2) * width)
                         ymin = int((y - height_ / 2) * height)
                         xmax = int(xmin + width_ * width)
@@ -181,10 +172,30 @@ def infer_on_stream(args, client):
             if len(person_box)>0:
                 nms_indexes = cv2.dnn.NMSBoxes(person_box, person_confidence, args.prob_threshold, args.prob_threshold)
                 person_box_final = [person_box[i] for i in nms_indexes.flatten()]
+                if prev_person_box_final:
+                    person_box_combined = prev_person_box_final+person_box_final
+                    nms_indexes_comb = cv2.dnn.NMSBoxes(person_box_combined, [1 for _ in range(len(person_box_combined))], 0.9, 0.1)
+                    #print('%s - %s' % (len(person_box_final), len(nms_indexes_comb)))
+                    people_count += len(nms_indexes_comb)-len(person_box_final)
+                    if len(nms_indexes_comb)>len(person_box_final):
+                        stop_frame = True
+                        person_box_comb= [person_box_combined[i] for i in nms_indexes_comb.flatten()]
+                else:
+                    people_count += len(person_box_final)
+                prev_person_box_final = copy.copy(person_box_final)
                 for rect in person_box_final:
-                    #print('draw: %s' % person)
                     cv2.rectangle(frame,(rect[0],rect[1]),(rect[2],rect[3]),[0,0,255],6)
+                if stop_frame:
+                    for rect in person_box_comb:
+                        cv2.rectangle(frame,(rect[0],rect[1]),(rect[2],rect[3]),[0,255,0],6)
+
+            
+            stats = 'People Count: %s' % (people_count)
+            cv2.putText(frame, stats, (15, 20), cv2.FONT_HERSHEY_COMPLEX, 0.75, (200, 10, 10), 2)
+            #out.write(frame)
             cv2.imshow('test', frame)
+            if stop_frame:
+                cv2.waitKey()
             key = cv2.waitKey(1)
 
             if key in {ord("q"), ord("Q"), 27}: # ESC key
@@ -198,7 +209,8 @@ def infer_on_stream(args, client):
         ### TODO: Send the frame to the FFMPEG server ###
 
         ### TODO: Write an output image if `single_image_mode` ###
-
+    cap.release()
+    out.release()    
 
 def main():
     """

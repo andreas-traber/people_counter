@@ -47,15 +47,9 @@ class Network:
         self.ie = IECore()
         self.net = self.ie.read_network(model=model_xml, weights=model_bin)
         self.exec_network = self.ie.load_network(network=self.net, device_name=device)
-        # print(self.ie.query_network(network=self.net, device_name=device))
-
-        # net = IENetwork()
-        # print(self.net.layers)
 
         ### TODO: Check for supported layers ###
         self.output_blobs = next(iter(self.net.outputs))
-        # print(self.output_blobs)
-        #print(net.outputs)
         ### TODO: Add any necessary extensions ###
         ### TODO: Return the loaded inference plugin ###
         ### Note: You may need to update the function parameters. ###
@@ -96,4 +90,3 @@ class Network:
         self.anchors =  []
         for i in [int(i) for i in self.net.layers[layer_name].params['mask'].split(',')]:
             self.anchors += [ anchors[i * 2], anchors[i * 2 + 1]]
-        print(self.anchors)
