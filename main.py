@@ -39,6 +39,9 @@ import itertools
 from math import exp
 import copy
 
+import datetime
+
+
 # MQTT server environment variables
 HOSTNAME = socket.gethostname()
 IPADDRESS = socket.gethostbyname(HOSTNAME)
@@ -124,6 +127,7 @@ def infer_on_stream(args, client):
     person_gone = True
     people_count = 0
     prev_person_box_final = None
+    last_frame = datetime.datetime.now()
     ### TODO: Loop until stream is over ###
     while cap.isOpened():
 
@@ -178,7 +182,7 @@ def infer_on_stream(args, client):
                     #print('%s - %s' % (len(person_box_final), len(nms_indexes_comb)))
                     people_count += len(nms_indexes_comb)-len(person_box_final)
                     if len(nms_indexes_comb)>len(person_box_final):
-                        stop_frame = True
+                        #stop_frame = True
                         person_box_comb= [person_box_combined[i] for i in nms_indexes_comb.flatten()]
                 else:
                     people_count += len(person_box_final)
@@ -189,8 +193,9 @@ def infer_on_stream(args, client):
                     for rect in person_box_comb:
                         cv2.rectangle(frame,(rect[0],rect[1]),(rect[2],rect[3]),[0,255,0],6)
 
-            
-            stats = 'People Count: %s' % (people_count)
+            FPS = 1000000 / (datetime.datetime.now() - last_frame).microseconds
+            last_frame = datetime.datetime.now()
+            stats = 'FPS: %s \nPeople Count: %s' % (FPS, people_count)
             cv2.putText(frame, stats, (15, 20), cv2.FONT_HERSHEY_COMPLEX, 0.75, (200, 10, 10), 2)
             #out.write(frame)
             cv2.imshow('test', frame)
