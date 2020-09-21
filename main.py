@@ -74,12 +74,17 @@ def build_argparser():
     parser.add_argument("-pt", "--prob_threshold", type=float, default=0.5,
                         help="Probability threshold for detections filtering"
                         "(0.5 by default)")
+    parser.add_argument("-o", "--output", type=str, default=False, required=False,
+                        help="output-file")
+    parser.add_argument("-c", "--cv-output", type=bool, default=False, required=False,
+                        help="output-file")
     return parser
 
 
 def connect_mqtt():
     ### TODO: Connect to the MQTT client ###
-    client = None
+    client = mqtt.Client()
+    client.connect(MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE_INTERVAL)
 
     return client
 
@@ -117,17 +122,27 @@ def infer_on_stream(args, client):
     net_input_shape = infer_network.get_input_shape()
 
     ### TODO: Handle the input stream ###
+    image_flag = False
+
+    # Check if the input is a webcam
+    if args.input == 'CAM':
+        args.input = 0
+    elif args.input.endswith('.jpg') or args.input.endswith('.bmp') or args.input.endswith('.png'):
+        image_flag = True
+
     cap = cv2.VideoCapture(args.input)
     cap.open(args.input)
 
     width = int(cap.get(3))
     height = int(cap.get(4))
-    out = cv2.VideoWriter('out.mp4', cv2.VideoWriter_fourcc('M','J','P','G'), cap.get(cv2.CAP_PROP_FPS), (width,height))
-    no_person_for_frames = 0
-    person_gone = True
+    #out = cv2.VideoWriter('out.mp4', cv2.VideoWriter_fourcc('M','J','P','G'), cap.get(cv2.CAP_PROP_FPS), (width,height))
+    frame_duration =1/cap.get(cv2.CAP_PROP_FPS)
     people_count = 0
     prev_person_box_final = None
     last_frame = datetime.datetime.now()
+    stats={'person': {'count': 0 , 'total': 0, 'duration': 0.0}}
+    skip_frames = 100
+    frame_cnt = 0
     ### TODO: Loop until stream is over ###
     while cap.isOpened():
 
@@ -135,7 +150,9 @@ def infer_on_stream(args, client):
         flag, frame = cap.read()
         if not flag:
             break
-
+        frame_cnt += 1
+        if frame_cnt<skip_frames:
+            continue
         ### TODO: Pre-process the image as needed ###
         frame_resized = cv2.resize(frame, (net_input_shape[3], net_input_shape[2]))
         frame_resized = frame_resized.transpose((2,0,1))
@@ -173,49 +190,67 @@ def infer_on_stream(args, client):
                         ymax = int(ymin + height_ * height)
                         person_box.append([xmin, ymin, xmax, ymax])
                         person_confidence.append(float(bbox[5]))
+                
+            ### TODO: Calculate and send relevant information on ###
+            ### current_count, total_count and duration to the MQTT server ###
+            ### Topic "person": keys of "count" and "total" ###
+            ### Topic "person/duration": key of "duration" ###
             if len(person_box)>0:
                 nms_indexes = cv2.dnn.NMSBoxes(person_box, person_confidence, args.prob_threshold, args.prob_threshold)
                 person_box_final = [person_box[i] for i in nms_indexes.flatten()]
+                stats['person']['count'] = len(person_box_final)
                 if prev_person_box_final:
                     person_box_combined = prev_person_box_final+person_box_final
                     nms_indexes_comb = cv2.dnn.NMSBoxes(person_box_combined, [1 for _ in range(len(person_box_combined))], 0.9, 0.1)
-                    #print('%s - %s' % (len(person_box_final), len(nms_indexes_comb)))
-                    people_count += len(nms_indexes_comb)-len(person_box_final)
+                    stats['person']['total'] += len(nms_indexes_comb)-len(person_box_final)
+                    # same person as last seen one ?
                     if len(nms_indexes_comb)>len(person_box_final):
                         #stop_frame = True
                         person_box_comb= [person_box_combined[i] for i in nms_indexes_comb.flatten()]
+                        stats['person']['duration'] = 0.000
+                    else:
+                        stats['person']['duration'] = round(stats['person']['duration']  + frame_duration, 3)
                 else:
-                    people_count += len(person_box_final)
+                    stats['person']['total'] += len(person_box_final)
                 prev_person_box_final = copy.copy(person_box_final)
                 for rect in person_box_final:
                     cv2.rectangle(frame,(rect[0],rect[1]),(rect[2],rect[3]),[0,0,255],6)
                 if stop_frame:
                     for rect in person_box_comb:
                         cv2.rectangle(frame,(rect[0],rect[1]),(rect[2],rect[3]),[0,255,0],6)
+            else:
+                stats['person']['count'] = 0
 
-            FPS = 1000000 / (datetime.datetime.now() - last_frame).microseconds
+            FPS = round(1000000 / (datetime.datetime.now() - last_frame).microseconds, 2)
             last_frame = datetime.datetime.now()
-            stats = 'FPS: %s \nPeople Count: %s' % (FPS, people_count)
-            cv2.putText(frame, stats, (15, 20), cv2.FONT_HERSHEY_COMPLEX, 0.75, (200, 10, 10), 2)
+            stats_string = ['Frame: %s' % frame_cnt,
+                            'FPS: %s' % FPS, 
+                            'Count: %s' % stats['person']['count'],
+                            'Total: %s' % stats['person']['total'],
+                            'Duration(s): %s' % stats['person']['duration']]
+            for i in range(len(stats_string)):
+                cv2.putText(frame, stats_string[i], (15, 20+i*20), cv2.FONT_HERSHEY_COMPLEX, 0.75, (200, 10, 10), 2)
             #out.write(frame)
-            cv2.imshow('test', frame)
-            if stop_frame:
-                cv2.waitKey()
+            #cv2.imshow('test', frame)
+            """if stop_frame:
+                cv2.waitKey()"""
             key = cv2.waitKey(1)
 
             if key in {ord("q"), ord("Q"), 27}: # ESC key
                 break
-                
-            ### TODO: Calculate and send relevant information on ###
-            ### current_count, total_count and duration to the MQTT server ###
-            ### Topic "person": keys of "count" and "total" ###
-            ### Topic "person/duration": key of "duration" ###
-
+            client.publish('person', json.dumps(stats['person']))
+            client.publish('person/duration', json.dumps(stats['person']['duration']))
         ### TODO: Send the frame to the FFMPEG server ###
+        sys.stdout.buffer.write(frame)
+        sys.stdout.flush()
 
         ### TODO: Write an output image if `single_image_mode` ###
+        if image_flag:
+            cv2.imwrite('output_image.jpg', frame)
     cap.release()
+    
     out.release()    
+    client.disconnect()
 
 def main():
     """

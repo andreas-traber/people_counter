@@ -6,3 +6,7 @@ __pycache__
 test.py
 .idea
 out.mp4
+fac.ffm
+output_image.jpg
+webservice/server/package-lock.json
+webservice/ui/package-lock.json
