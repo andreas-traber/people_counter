@@ -75,14 +75,20 @@ def build_argparser():
                         help="Probability threshold for detections filtering"
                         "(0.5 by default)")
     parser.add_argument("-o", "--output", type=str, default=False, required=False,
-                        help="output-file")
-    parser.add_argument("-c", "--cv-output", type=bool, default=False, required=False,
-                        help="output-file")
+                        help="Write result to this output-file")
+    parser.add_argument("-c", "--cv-output", dest='cv_output', default=False, required=False, action='store_true',
+                        help="output in a cv-window")
+    parser.add_argument("-fs", "--frame-stats", dest='frame_stats', default=False, required=False, action='store_true',
+                        help="Stats are written on the frames")
+    parser.add_argument("--no-stream", dest='no_stream', default=False, required=False, action='store_true',
+                        help="doesn't write a stream output")
+    parser.add_argument("--no-mqtt", dest='no_mqtt', default=False, required=False, action='store_true',
+                        help="doesn't publish to mqtt")
     return parser
 
 
 def connect_mqtt():
-    ### TODO: Connect to the MQTT client ###
+    ### Connect to the MQTT client ###
     client = mqtt.Client()
     client.connect(MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE_INTERVAL)
 
@@ -117,11 +123,11 @@ def infer_on_stream(args, client):
     # Set Probability threshold for detections
     prob_threshold = args.prob_threshold
 
-    ### TODO: Load the model through `infer_network` ###
-    infer_network.load_model(args.model)
+    ### Load the model through `infer_network` ###
+    infer_network.load_model(args.model, args.device, args.cpu_extension)
     net_input_shape = infer_network.get_input_shape()
 
-    ### TODO: Handle the input stream ###
+    ###  Handle the input stream ###
     image_flag = False
 
     # Check if the input is a webcam
@@ -135,40 +141,40 @@ def infer_on_stream(args, client):
 
     width = int(cap.get(3))
     height = int(cap.get(4))
-    #out = cv2.VideoWriter('out.mp4', cv2.VideoWriter_fourcc('M','J','P','G'), cap.get(cv2.CAP_PROP_FPS), (width,height))
+    if args.output:
+        out = cv2.VideoWriter(args.output, cv2.VideoWriter_fourcc('M','J','P','G'), cap.get(cv2.CAP_PROP_FPS), (width,height))
     frame_duration =1/cap.get(cv2.CAP_PROP_FPS)
-    people_count = 0
     prev_person_box_final = None
     last_frame = datetime.datetime.now()
     stats={'person': {'count': 0 , 'total': 0, 'duration': 0.0}}
     skip_frames = 100
     frame_cnt = 0
-    ### TODO: Loop until stream is over ###
+    ### Loop until stream is over ###
     while cap.isOpened():
 
-        ### TODO: Read from the video capture ###
+        ### Read from the video capture ###
         flag, frame = cap.read()
         if not flag:
             break
         frame_cnt += 1
         if frame_cnt<skip_frames:
             continue
-        ### TODO: Pre-process the image as needed ###
+        ### Pre-process the image as needed ###
         frame_resized = cv2.resize(frame, (net_input_shape[3], net_input_shape[2]))
         frame_resized = frame_resized.transpose((2,0,1))
         frame_resized = frame_resized.reshape(1, *frame_resized.shape)
 
-        ### TODO: Start asynchronous inference for specified request ###
+        ### Start asynchronous inference for specified request ###
         infer_network.exec_net(frame_resized)
 
-        ### TODO: Wait for the result ###
+        ### Wait for the result ###
         if infer_network.wait() == 0:
-            ### TODO: Get the results of the inference request ###
+            ### Get the results of the inference request ###
             result = infer_network.get_output()
-            ### TODO: Extract any desired stats from the results ###
+            ### Extract any desired stats from the results ###
             person_box = []
             person_confidence = []
-            stop_frame = False
+            #stop_frame = False
             for layer_name, blob in result.items():
                 bbox_size = infer_network.get_bbox_size(layer_name)
                 res=blob.buffer[0]
@@ -191,7 +197,7 @@ def infer_on_stream(args, client):
                         person_box.append([xmin, ymin, xmax, ymax])
                         person_confidence.append(float(bbox[5]))
                 
-            ### TODO: Calculate and send relevant information on ###
+            ###  Calculate and send relevant information on ###
             ### current_count, total_count and duration to the MQTT server ###
             ### Topic "person": keys of "count" and "total" ###
             ### Topic "person/duration": key of "duration" ###
@@ -215,42 +221,48 @@ def infer_on_stream(args, client):
                 prev_person_box_final = copy.copy(person_box_final)
                 for rect in person_box_final:
                     cv2.rectangle(frame,(rect[0],rect[1]),(rect[2],rect[3]),[0,0,255],6)
-                if stop_frame:
+                """if stop_frame:
                     for rect in person_box_comb:
-                        cv2.rectangle(frame,(rect[0],rect[1]),(rect[2],rect[3]),[0,255,0],6)
+                        cv2.rectangle(frame,(rect[0],rect[1]),(rect[2],rect[3]),[0,255,0],6)"""
             else:
                 stats['person']['count'] = 0
 
             FPS = round(1000000 / (datetime.datetime.now() - last_frame).microseconds, 2)
             last_frame = datetime.datetime.now()
-            stats_string = ['Frame: %s' % frame_cnt,
-                            'FPS: %s' % FPS, 
-                            'Count: %s' % stats['person']['count'],
-                            'Total: %s' % stats['person']['total'],
-                            'Duration(s): %s' % stats['person']['duration']]
-            for i in range(len(stats_string)):
-                cv2.putText(frame, stats_string[i], (15, 20+i*20), cv2.FONT_HERSHEY_COMPLEX, 0.75, (200, 10, 10), 2)
-            #out.write(frame)
-            #cv2.imshow('test', frame)
+            if args.frame_stats:
+                stats_string = ['Frame: %s' % frame_cnt,
+                                'FPS: %s' % FPS, 
+                                'Count: %s' % stats['person']['count'],
+                                'Total: %s' % stats['person']['total'],
+                                'Duration(s): %s' % stats['person']['duration']]
+                for i in range(len(stats_string)):
+                    cv2.putText(frame, stats_string[i], (15, 20+i*20), cv2.FONT_HERSHEY_COMPLEX, 0.75, (200, 10, 10), 2)
+            if args.output:
+                out.write(frame)
+            if args.cv_output:
+                cv2.imshow('test', frame)
             """if stop_frame:
                 cv2.waitKey()"""
             key = cv2.waitKey(1)
 
             if key in {ord("q"), ord("Q"), 27}: # ESC key
                 break
-            client.publish('person', json.dumps(stats['person']))
-            client.publish('person/duration', json.dumps(stats['person']['duration']))
-        ### TODO: Send the frame to the FFMPEG server ###
-        sys.stdout.buffer.write(frame)
-        sys.stdout.flush()
+            if not args.no_mqtt:
+                client.publish('person', json.dumps({"total": stats['person']['total'], "count": stats['person']['count']}))
+                client.publish('person/duration', stats['person']['duration'])
+        ### Send the frame to the FFMPEG server ###
+        if not args.no_stream:
+            sys.stdout.buffer.write(frame)
+            sys.stdout.flush()
 
-        ### TODO: Write an output image if `single_image_mode` ###
+        ### Write an output image if `single_image_mode` ###
         if image_flag:
             cv2.imwrite('output_image.jpg', frame)
     cap.release()
-    
-    out.release()    
-    client.disconnect()
+    if args.output:
+        out.release()  
+    if not args.no_mqtt:  
+        client.disconnect()
 
 def main():
     """
@@ -261,7 +273,10 @@ def main():
     # Grab command line args
     args = build_argparser().parse_args()
     # Connect to the MQTT server
-    client = connect_mqtt()
+    if args.no_mqtt:
+        client=None
+    else:
+        client = connect_mqtt()
     # Perform inference on the input stream
     infer_on_stream(args, client)
 

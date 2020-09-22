@@ -47,13 +47,21 @@ class Network:
         self.ie = IECore()
         self.net = self.ie.read_network(model=model_xml, weights=model_bin)
         self.exec_network = self.ie.load_network(network=self.net, device_name=device)
-
-        ### TODO: Check for supported layers ###
         self.output_blobs = next(iter(self.net.outputs))
-        ### TODO: Add any necessary extensions ###
-        ### TODO: Return the loaded inference plugin ###
+
+        ### Check for supported layers ###
+        supported_layers = self.ie.query_network(network=self.net, device_name=device)    
+        unsupported_layers = [l for l in self.net.layers.keys() if l not in supported_layers]
+        if len(unsupported_layers) != 0:
+            print("Unsupported layers found: {}".format(unsupported_layers))
+            print("Check whether extensions are available to add to IECore.")
+            exit(1)
+        ### Add any necessary extensions ###
+        if cpu_extension:
+            self.ie.add_extension(cpu_extension, "CPU")
+        ### Return the loaded inference plugin ###
         ### Note: You may need to update the function parameters. ###
-        return
+        return self.ie
 
     def get_input_shape(self):
         ### Return the shape of the input layer ###

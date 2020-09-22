@@ -6,9 +6,19 @@ questions.
 
 ## Explaining Custom Layers
 
-The process behind converting custom layers involves...
+The process behind converting custom layers involves :
+- Generating an the Extension Template Files Using the Model Extension Generator
+- Using Model Optimizer to Generate IR Files Containing the Custom Layer
+- Editing the Extractor Extension Template File
+- Editing the Operation Extension Template File
+- Generating the Model IR Files
+- Editing the CPU Extension Template Files
+- Compiling the Extension Library
+- Adding the CPU-Extension to the Inference Engine
 
-Some of the potential reasons for handling custom layers are...
+
+Some of the potential reasons for handling custom layers are:
+- When the Model Optimizier doesn't support a layer
 
 ## Comparing Model Performance
 
