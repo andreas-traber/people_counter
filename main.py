@@ -248,8 +248,12 @@ def infer_on_stream(args, client):
             if key in {ord("q"), ord("Q"), 27}: # ESC key
                 break
             if not args.no_mqtt:
-                client.publish('person', json.dumps({"total": stats['person']['total'], "count": stats['person']['count']}))
-                client.publish('person/duration', stats['person']['duration'])
+                total_count = stats['person']['total']
+                count = stats['person']['count']
+                duration = stats['person']['duration']
+                client.publish("person", json.dumps({"total":total_count}))
+                client.publish("person/duration", json.dumps({"duration":duration}))
+                client.publish("person", json.dumps({"count":count}))
         ### Send the frame to the FFMPEG server ###
         if not args.no_stream:
             sys.stdout.buffer.write(frame)
