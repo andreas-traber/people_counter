@@ -23,7 +23,8 @@ Some of the potential reasons for handling custom layers are:
 ## Comparing Model Performance
 
 My method(s) to compare models before and after conversion to Intermediate Representations
-were...
+were:
+I downloaded this git project https://github.com/pythonlessons/TensorFlow-2.x-YOLOv3.git and used my yolov3 weights and the Pedestrian-Video from the Udacity Project.
 
 The difference between model accuracy pre- and post-conversion was...
 
