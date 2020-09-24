@@ -24,47 +24,39 @@ Some of the potential reasons for handling custom layers are:
 
 My method(s) to compare models before and after conversion to Intermediate Representations
 were:
-I downloaded this git project https://github.com/pythonlessons/TensorFlow-2.x-YOLOv3.git and used my yolov3 weights and the Pedestrian-Video from the Udacity Project.
+I downloaded this git project https://github.com/pythonlessons/TensorFlow-2.x-YOLOv3.git and used my yolov3 weights and the Pedestrian-Video from the Udacity Project. I added a output for the probability for each frame and the time it took to run. I did the same in my projekt (argument --print-stats) and compared the values in an Excel-Sheet(compare_vino_tf.ods).
 
-The difference between model accuracy pre- and post-conversion was...
+The difference between model accuracy pre- and post-conversion was: The model pre-conversion identified 137 more frames with people(overall 1060), where as the converted model found 1 more frame with a person(overall 922). Both using a threshold of 0.5.
 
-The size of the model pre- and post-conversion was...
+The size of the model pre- and post-conversion was: The original yolov3.weights has 248 MB, the coverted bin+xml-files have nearly the same size.
 
-The inference time of the model pre- and post-conversion was...
+The inference time of the model pre- and post-conversion was: The interference Engine took around 335 seconds, for the whole video. The downloaded Tensorflow-Project took around 436 seconds.
 
 ## Assess Model Use Cases
 
-Some of the potential use cases of the people counter app are...
+Some of the potential use cases of the people counter app are:
+-You could use this counter for events, where there is a limit on how many people are allowed in a room/builidng and count the people, who went in, and substract the people who left.
+-For polling stations, you could count, how many people went voting and compare it to the number of casted votes. 
 
-Each of these use cases would be useful because...
+Each of these use cases would be useful because:
+they outsource boring repetitive work to a machine.
 
 ## Assess Effects on End User Needs
 
 Lighting, model accuracy, and camera focal length/image size have different effects on a
 deployed edge model. The potential effects of each of these are as follows...
+Lighning:
+    e.g. in dark rooms, people with dark clothes are harder to detect, since there are no clear edges between background and person
+Model accurary:
+    means, how well the model recognizes the trained classes
+- 
 
 ## Model Research
 
-[This heading is only required if a suitable model was not found after trying out at least three
-different models. However, you may also use this heading to detail how you converted 
-a successful model.]
+I converted the model using following commands:
 
-In investigating potential people counter models, I tried each of the following three models:
-
-- Model 1: [Name]
-  - [Model Source]
-  - I converted the model to an Intermediate Representation with the following arguments...
-  - The model was insufficient for the app because...
-  - I tried to improve the model for the app by...
-  
-- Model 2: [Name]
-  - [Model Source]
-  - I converted the model to an Intermediate Representation with the following arguments...
-  - The model was insufficient for the app because...
-  - I tried to improve the model for the app by...
-
-- Model 3: [Name]
-  - [Model Source]
-  - I converted the model to an Intermediate Representation with the following arguments...
-  - The model was insufficient for the app because...
-  - I tried to improve the model for the app by...
+wget https://raw.githubusercontent.com/pjreddie/darknet/master/data/coco.names
+wget https://pjreddie.com/media/files/yolov3.weights
+git clone https://github.com/mystic123/tensorflow-yolo-v3.git
+python3 ../../tensorflow-yolo-v3/convert_weights_pb.py --class_names coco.names --data_format NHWC --weights_file yolov3.weights
+python3 ../../openvino/model-optimizer/mo.py --input_model frozen_darknet_yolov3_model.pb --tensorflow_use_custom_operations_config ../../openvino/model-optimizer/extensions/front/tf/yolo_v3.json --batch 1

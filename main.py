@@ -84,6 +84,8 @@ def build_argparser():
                         help="doesn't write a stream output")
     parser.add_argument("--no-mqtt", dest='no_mqtt', default=False, required=False, action='store_true',
                         help="doesn't publish to mqtt")
+    parser.add_argument("--print-stats", dest='print_stats', default=False, required=False, action='store_true',
+                        help="prints stats for comparision")
     return parser
 
 
@@ -145,10 +147,12 @@ def infer_on_stream(args, client):
         out = cv2.VideoWriter(args.output, cv2.VideoWriter_fourcc('M','J','P','G'), cap.get(cv2.CAP_PROP_FPS), (width,height))
     frame_duration =1/cap.get(cv2.CAP_PROP_FPS)
     prev_person_box_final = None
+    confidence_final = []
     last_frame = datetime.datetime.now()
+    start = time.time()
     stats={'person': {'count': 0 , 'total': 0, 'duration': 0.0}}
-    skip_frames = 100
-    frame_cnt = 0
+    skip_frames = -1
+    frame_cnt = -1
     ### Loop until stream is over ###
     while cap.isOpened():
 
@@ -204,6 +208,7 @@ def infer_on_stream(args, client):
             if len(person_box)>0:
                 nms_indexes = cv2.dnn.NMSBoxes(person_box, person_confidence, args.prob_threshold, args.prob_threshold)
                 person_box_final = [person_box[i] for i in nms_indexes.flatten()]
+                confidence_final = [person_confidence[i] for i in nms_indexes.flatten()]
                 stats['person']['count'] = len(person_box_final)
                 if prev_person_box_final:
                     person_box_combined = prev_person_box_final+person_box_final
@@ -226,7 +231,9 @@ def infer_on_stream(args, client):
                         cv2.rectangle(frame,(rect[0],rect[1]),(rect[2],rect[3]),[0,255,0],6)"""
             else:
                 stats['person']['count'] = 0
-
+                confidence_final = []
+            if args.print_stats:
+                print('%s: %s' % (frame_cnt, ','.join([str(b) for b in confidence_final])))
             FPS = round(1000000 / (datetime.datetime.now() - last_frame).microseconds, 2)
             last_frame = datetime.datetime.now()
             if args.frame_stats:
@@ -262,6 +269,8 @@ def infer_on_stream(args, client):
         ### Write an output image if `single_image_mode` ###
         if image_flag:
             cv2.imwrite('output_image.jpg', frame)
+    if args.print_stats:
+        print('took: %s seconds' % (time.time()-start))
     cap.release()
     if args.output:
         out.release()  
