@@ -52,14 +52,27 @@ Lighning:
     e.g. in dark rooms, people with dark clothes are harder to detect, since there are no clear edges between background and person
 Model accurary:
     means, how well the model recognizes the trained classes
-- 
+Camera focal length/image size:
+    A camera with a high focal length is better in recognizing specific objects, whereas a camera with a low focal length can cover bigger spaces.
 
 ## Model Research
 
-I converted the model using following commands:
+### Yolov3
 
-wget https://raw.githubusercontent.com/pjreddie/darknet/master/data/coco.names
-wget https://pjreddie.com/media/files/yolov3.weights
-git clone https://github.com/mystic123/tensorflow-yolo-v3.git
-python3 ../../tensorflow-yolo-v3/convert_weights_pb.py --class_names coco.names --data_format NHWC --weights_file yolov3.weights
-python3 ../../openvino/model-optimizer/mo.py --input_model frozen_darknet_yolov3_model.pb --tensorflow_use_custom_operations_config ../../openvino/model-optimizer/extensions/front/tf/yolo_v3.json --batch 1
+#### Convert to Intermediate Representation
+Download the Class Names 
+`wget https://raw.githubusercontent.com/pjreddie/darknet/master/data/coco.names`
+
+Download the model
+`wget https://pjreddie.com/media/files/yolov3.weights`
+
+Use this project to convert to PB(Tensoerflow)-format
+`git clone https://github.com/mystic123/tensorflow-yolo-v3.git`
+
+`python3 tensorflow-yolo-v3/convert_weights_pb.py --class_names coco.names --data_format NHWC --weights_file yolov3.weights`
+
+Use OpenVino Model Optimzier to convert to Intermediate Representation
+`python3 ../../openvino/model-optimizer/mo.py --input_model frozen_darknet_yolov3_model.pb --tensorflow_use_custom_operations_config ../../openvino/model-optimizer/extensions/front/tf/yolo_v3.json --batch 1`
+
+#### Performance
+Even though the original Yolov3-model seems to be sufficent for this application, the converterted model missed a lot frames(see Comparing Model Performance) and therefor didn't meet the requirements for this project.
