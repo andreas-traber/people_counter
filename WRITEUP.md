@@ -26,11 +26,14 @@ My method(s) to compare models before and after conversion to Intermediate Repre
 were:
 I downloaded this git project https://github.com/pythonlessons/TensorFlow-2.x-YOLOv3.git and used my yolov3 weights and the Pedestrian-Video from the Udacity Project. I added a output for the probability for each frame and the time it took to run. I did the same in my projekt (argument --print-stats) and compared the values in an Excel-Sheet(compare_vino_tf.ods).
 
-The difference between model accuracy pre- and post-conversion was: The model pre-conversion identified 137 more frames with people(overall 1060), where as the converted model found 1 more frame with a person(overall 922). Both using a threshold of 0.5.
+The difference between model accuracy pre- and post-conversion was: The model pre-conversion identified 137 more frames with people(overall 1060), where as the converted model found 1 more frame with a person(overall 922). Both using a threshold of 0.5. Changing the threshold to 0.4 and 0.3 for the converted model didn't make much difference. Therefore the accuracy of the converted model is not sufficent.
 
 The size of the model pre- and post-conversion was: The original yolov3.weights has 248 MB, the coverted bin+xml-files have nearly the same size.
 
 The inference time of the model pre- and post-conversion was: The interference Engine took around 335 seconds, for the whole video. The downloaded Tensorflow-Project took around 436 seconds.
+
+When comparing the FPS(tab FPS in compare_vino_tf.ods) the original model has average FPS of ~ 3.20 and the converted model has average FPS of ~ 4.55.
+
 
 ## Assess Model Use Cases
 

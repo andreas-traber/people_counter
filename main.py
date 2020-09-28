@@ -232,10 +232,10 @@ def infer_on_stream(args, client):
             else:
                 stats['person']['count'] = 0
                 confidence_final = []
-            if args.print_stats:
-                print('%s: %s' % (frame_cnt, ','.join([str(b) for b in confidence_final])))
             FPS = round(1000000 / (datetime.datetime.now() - last_frame).microseconds, 2)
             last_frame = datetime.datetime.now()
+            if args.print_stats:
+                print('%s: %s: %s' % (frame_cnt, ','.join([str(b) for b in confidence_final]), FPS))
             if args.frame_stats:
                 stats_string = ['Frame: %s' % frame_cnt,
                                 'FPS: %s' % FPS, 
