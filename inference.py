@@ -48,6 +48,7 @@ class Network:
         self.net = self.ie.read_network(model=model_xml, weights=model_bin)
         self.exec_network = self.ie.load_network(network=self.net, device_name=device)
         self.output_blobs = next(iter(self.net.outputs))
+        self.input_name = next(iter(self.net.input_info.keys()))
 
         ### Check for supported layers ###
         supported_layers = self.ie.query_network(network=self.net, device_name=device)    
@@ -55,7 +56,7 @@ class Network:
         if len(unsupported_layers) != 0:
             print("Unsupported layers found: {}".format(unsupported_layers))
             print("Check whether extensions are available to add to IECore.")
-            exit(1)
+            #exit(1)
         ### Add any necessary extensions ###
         if cpu_extension:
             self.ie.add_extension(cpu_extension, "CPU")
@@ -65,11 +66,11 @@ class Network:
 
     def get_input_shape(self):
         ### Return the shape of the input layer ###
-        return self.net.input_info['inputs'].input_data.shape
+        return self.net.input_info[self.input_name].input_data.shape
 
     def exec_net(self, image):
         ### Start an asynchronous request ###
-        self.exec_network.start_async(request_id=0, inputs={'inputs': image})
+        self.exec_network.start_async(request_id=0, inputs={self.input_name: image})
         ### TODO: Return any necessary information ###
         ### Note: You may need to update the function parameters. ###
         return
@@ -87,6 +88,7 @@ class Network:
         return self.exec_network.requests[0].output_blobs
 
     def get_bbox_size(self, layer_name):
+        print(self.net.layers[layer_name].params.keys())
         return 1 + int(self.net.layers[layer_name].params['coords']) + int(self.net.layers[layer_name].params['classes'])
 
     def get_num_bboxes(self, layer_name):

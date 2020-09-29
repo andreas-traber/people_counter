@@ -179,28 +179,39 @@ def infer_on_stream(args, client):
             person_box = []
             person_confidence = []
             #stop_frame = False
-            for layer_name, blob in result.items():
-                bbox_size = infer_network.get_bbox_size(layer_name)
-                res=blob.buffer[0]
-                for row, col, n in  itertools.product(range(res.shape[1]), range(res.shape[2]), range(infer_network.get_num_bboxes(layer_name))):
-                    bbox = res[n*bbox_size:(n+1)*bbox_size, row, col]
-                    # only need person class probability
-                    bbox = bbox[:6]
-                    if bbox[4]>args.prob_threshold and bbox[5]>args.prob_threshold:
-                        x = (col + bbox[0]) / res.shape[1]
-                        y = (row + bbox[1]) / res.shape[2]
-                        width_ = exp(bbox[2])
-                        height_ = exp(bbox[3])
-                        infer_network.create_anchors(layer_name)
-                        width_ = width_ * float(infer_network.anchors[2 * n]) / float(net_input_shape[2])
-                        height_ = height_ * float(infer_network.anchors[2 * n + 1]) / float(net_input_shape[3])
-                        xmin = int((x - width_ / 2) * width)
-                        ymin = int((y - height_ / 2) * height)
-                        xmax = int(xmin + width_ * width)
-                        ymax = int(ymin + height_ * height)
-                        person_box.append([xmin, ymin, xmax, ymax])
-                        person_confidence.append(float(bbox[5]))
-                
+            if 'yolo' in args.model: 
+                for layer_name, blob in result.items():
+                    bbox_size = infer_network.get_bbox_size(layer_name)
+                    res=blob.buffer[0]
+                    for row, col, n in  itertools.product(range(res.shape[1]), range(res.shape[2]), range(infer_network.get_num_bboxes(layer_name))):
+                        bbox = res[n*bbox_size:(n+1)*bbox_size, row, col]
+                        # only need person class probability
+                        bbox = bbox[:6]
+                        if bbox[4]>args.prob_threshold and bbox[5]>args.prob_threshold:
+                            x = (col + bbox[0]) / res.shape[1]
+                            y = (row + bbox[1]) / res.shape[2]
+                            width_ = exp(bbox[2])
+                            height_ = exp(bbox[3])
+                            infer_network.create_anchors(layer_name)
+                            width_ = width_ * float(infer_network.anchors[2 * n]) / float(net_input_shape[2])
+                            height_ = height_ * float(infer_network.anchors[2 * n + 1]) / float(net_input_shape[3])
+                            xmin = int((x - width_ / 2) * width)
+                            ymin = int((y - height_ / 2) * height)
+                            xmax = int(xmin + width_ * width)
+                            ymax = int(ymin + height_ * height)
+                            person_box.append([xmin, ymin, xmax, ymax])
+                            person_confidence.append(float(bbox[5]))
+            elif 'person-detection-retail-0013' in args.model:
+                for _, blob in result.items():
+                    for res in blob.buffer[0][0]:
+                        if res[2]>args.prob_threshold:
+                            person_box.append([int(res[3]*width), int(res[4]*height), int(res[5]*width), int(res[6]*height)])
+                            person_confidence.append(float(res[2]))
+
+            else:
+                 print('Unknow model')
+                 exit(1)
+
             ###  Calculate and send relevant information on ###
             ### current_count, total_count and duration to the MQTT server ###
             ### Topic "person": keys of "count" and "total" ###

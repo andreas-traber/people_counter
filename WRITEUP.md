@@ -34,6 +34,9 @@ The inference time of the model pre- and post-conversion was: The interference E
 
 When comparing the FPS(tab FPS in compare_vino_tf.ods) the original model has average FPS of ~ 3.20 and the converted model has average FPS of ~ 4.55.
 
+As suggested by my Reviewer, I tried person-detection-retail-0013(FPS32) from the Pre-Trained Models. Detection Rate was about the same as the original Yolov3-Model. Size of xml+bin-Files is only 3.2 MB. It took about 22 seconds for the whole video, with average FPS of about 64. 
+
+
 
 ## Assess Model Use Cases
 
@@ -76,3 +79,14 @@ Use OpenVino Model Optimzier to convert to Intermediate Representation
 
 #### Performance
 Even though the original Yolov3-model seems to be sufficent for this application, the converterted model missed a lot frames(see Comparing Model Performance) and therefor didn't meet the requirements for this project.
+
+### person-detection-retail-0013
+
+#### Download
+Just use the downloader from the model-zoo
+`python3 downloader.py --name person-detection-retail-0013 --precision FP32 -o ~/python_projects/udacity/people_counter/model/`
+
+#### Performance
+This model met the requirements of the Project. Even thought, the original Yolov3-Model had about the same accuracy, this model from the model zoo is much smaller and much faster.
+
+
