@@ -8,6 +8,8 @@ questions.
 
 The process behind converting custom layers involves :
 - Generating an the Extension Template Files Using the Model Extension Generator
+- Registering the custom layers as extensions to the Model Optimizer (TensorFlow and Caffe)
+- Replacing unsupported subgraph with a different subgraph(TensorFlow only)
 - Using Model Optimizer to Generate IR Files Containing the Custom Layer
 - Editing the Extractor Extension Template File
 - Editing the Operation Extension Template File
